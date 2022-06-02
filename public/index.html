@@ -141,23 +141,23 @@
         w = window.innerWidth;
         h = window.innerHeight;
 
-        // if (scaleToFit) {
-        //   w = window.innerWidth;
-        //   h = window.innerHeight;
+        if (scaleToFit) {
+          w = window.innerWidth;
+          h = window.innerHeight;
 
-        //   var r = {{{ HEIGHT }}} / {{{ WIDTH }}};
-        //   // var r = 1280 / 1920;
+          var r = {{{ HEIGHT }}} / {{{ WIDTH }}};
+          // var r = 1280 / 1920;
 
-        //   if (w * r > window.innerHeight) {
-        //     w = Math.min(w, Math.ceil(h / r));
-        //   }
-        //   h = Math.floor(w * r);
-        // } else {
-        //   w = {{{ WIDTH }}};
-        //   h = {{{ HEIGHT }}};
-        //   // w = 1920;
-        //   // h = 1080;
-        // }
+          if (w * r > window.innerHeight) {
+            w = Math.min(w, Math.ceil(h / r));
+          }
+          h = Math.floor(w * r);
+        } else {
+          w = {{{ WIDTH }}};
+          h = {{{ HEIGHT }}};
+          // w = 1920;
+          // h = 1080;
+        }
 
         container.style.width = canvas.style.width = w + "px";
         container.style.height = canvas.style.height = h + "px";
