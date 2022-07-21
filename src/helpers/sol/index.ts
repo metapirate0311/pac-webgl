@@ -55,145 +55,143 @@ export class SolanaClient {
    * - get the metadata urls from the account infos and fetch the metadatas
    * - transform the nft metadatas to Audius-domain collectibles
    */
-  public getAllCollectibles = 
-  async (wallets: string[], filters: any[]): Promise<any> => {
-    try {
-      if (this.connection === null) throw new Error('No connection')
-      const connection = this.connection
+  public getAllCollectibles =
+    async (wallets: string[], filters: any[]): Promise<any> => {
+      try {
+        if (this.connection === null) throw new Error('No connection')
+        const connection = this.connection
 
-      const tokenAccountsByOwnerAddress = await Promise.all(
-        wallets.map(async address =>
-          connection.getParsedTokenAccountsByOwner(new PublicKey(address), {
-            programId: TOKEN_PROGRAM_ID
-          })
-        )
-      )
-      const potentialNFTsByOwnerAddress = tokenAccountsByOwnerAddress
-        .map(ta => ta.value)
-        // value is an array of parsed token info
-        .map((value) => {
-          const mintAddresses = value
-            .map(v => ({
-              mint: v.account.data.parsed.info.mint,
-              tokenAmount: v.account.data.parsed.info.tokenAmount,
-              tokenAccount: v.pubkey.toString()
-            }))
-            .filter(({ tokenAmount }) => {
-              // Filter out the token if we don't have any balance
-              const ownsNFT = tokenAmount.amount !== '0'
-              // Filter out the tokens that don't have 0 decimal places.
-              // NFTs really should have 0
-              const hasNoDecimals = tokenAmount.decimals === 0
-              return ownsNFT && hasNoDecimals
+        const tokenAccountsByOwnerAddress = await Promise.all(
+          wallets.map(async address =>
+            connection.getParsedTokenAccountsByOwner(new PublicKey(address), {
+              programId: TOKEN_PROGRAM_ID
             })
-            .map(({ mint, tokenAccount }) => ({ mint, tokenAccount }))
-          return { mintAddresses }
-        })
-      const nfts = await Promise.all(
-        potentialNFTsByOwnerAddress.map(async ({ mintAddresses }) => {
-          const programAddresses: any = await Promise.all(
-            mintAddresses.map(
-              async mintAddress => {
-                const program = await PublicKey.findProgramAddress(
-                  [
-                    Buffer.from('metadata'),
-                    METADATA_PROGRAM_ID_PUBLIC_KEY.toBytes(),
-                    new PublicKey(mintAddress.mint).toBytes()
-                  ],
-                  METADATA_PROGRAM_ID_PUBLIC_KEY
-                );
-              return {
-                ...mintAddress,
-                program
+          )
+        )
+        const potentialNFTsByOwnerAddress = tokenAccountsByOwnerAddress
+          .map(ta => ta.value)
+          // value is an array of parsed token info
+          .map((value) => {
+            const mintAddresses = value
+              .map(v => ({
+                mint: v.account.data.parsed.info.mint,
+                tokenAmount: v.account.data.parsed.info.tokenAmount,
+                tokenAccount: v.pubkey.toString()
+              }))
+              .filter(({ tokenAmount }) => {
+                // Filter out the token if we don't have any balance
+                const ownsNFT = tokenAmount.amount !== '0'
+                // Filter out the tokens that don't have 0 decimal places.
+                // NFTs really should have 0
+                const hasNoDecimals = tokenAmount.decimals === 0
+                return ownsNFT && hasNoDecimals
+              })
+              .map(({ mint, tokenAccount }) => ({ mint, tokenAccount }))
+            return { mintAddresses }
+          })
+        const nfts = await Promise.all(
+          potentialNFTsByOwnerAddress.map(async ({ mintAddresses }) => {
+            const programAddresses: any = await Promise.all(
+              mintAddresses.map(
+                async mintAddress => {
+                  const program = await PublicKey.findProgramAddress(
+                    [
+                      Buffer.from('metadata'),
+                      METADATA_PROGRAM_ID_PUBLIC_KEY.toBytes(),
+                      new PublicKey(mintAddress.mint).toBytes()
+                    ],
+                    METADATA_PROGRAM_ID_PUBLIC_KEY
+                  );
+                  return {
+                    ...mintAddress,
+                    program
+                  }
+                }
+              ))
+            let accountInfos: any[] = [];
+            for (let cur = 0; cur < programAddresses.length;) {
+              let subAddresses = programAddresses.slice(cur, cur + 100);
+              let subAccountInfos = await connection.getMultipleAccountsInfo(
+                subAddresses.map((program: any) => program.program[0])
+              )
+              accountInfos = [...accountInfos, ...subAccountInfos];
+              cur += 100;
+            }
+            accountInfos = accountInfos.map((account, index) => ({
+              account,
+              ...programAddresses[index]
+            }))
+            const nonNullInfos = accountInfos?.filter((info: any) => info.account) ?? []
+            let metadataList: any[] = [];
+            let tokenInfoList: any[] = [];
+
+            for (let i = 0; i < nonNullInfos.length; i++) {
+
+              let metadata = await decodeMetadata(nonNullInfos[i].account!.data);
+
+              if (filters.find(filter => metadata.updateAuthority === filter.updateAuthority && metadata?.data?.name.indexOf(filter.collectionName) >= 0)) {
+                metadataList.push({
+                  ...metadata,
+                  ...metadata.data
+                });
+
+                tokenInfoList.push(nonNullInfos[i]);
               }
             }
-          ))
-          let accountInfos: any[] = [];
-          for (let cur = 0; cur < programAddresses.length;) {
-            let subAddresses = programAddresses.slice(cur, cur + 100);
-            let subAccountInfos = await connection.getMultipleAccountsInfo(
-              subAddresses.map((program: any) => program.program[0] )
-            )
-            accountInfos = [ ...accountInfos, ...subAccountInfos ];
-            cur += 100;
-          }
-          accountInfos = accountInfos.map((account, index) => ({
-            account,
-            ...programAddresses[index]
-          }))
-          const nonNullInfos = accountInfos?.filter((info: any) => info.account) ?? []
-          let metadataList: any[] = [];
-          let tokenInfoList: any [] = [];
 
-          for (let i = 0; i < nonNullInfos.length; i ++) {
-            
-            let metadata = await decodeMetadata(nonNullInfos[i].account!.data);
-            
-            if (filters.find(filter => metadata.updateAuthority === filter.updateAuthority &&  metadata?.data?.name.indexOf(filter.collectionName) >= 0)) {
-              metadataList.push({
-                ...metadata,
-                ...metadata.data
-              });
-    
-              tokenInfoList.push(nonNullInfos[i]);
-            }
-          }
-          
-          console.log('metadataList', metadataList);
-          const results = await Promise.all(
-            metadataList.map(async item =>
-              fetch(item!.data.uri)
-                .then(res => res.json())
-                .catch(() => null)
+            console.log('metadataList', metadataList);
+            const results = await Promise.all(
+              metadataList.map(async item =>
+                fetch(item!.data.uri)
+                  .then(res => res.json())
+                  .catch(() => null)
+              )
             )
-          )
-          const metadatas = results.map((metadata, i) => ({
-            ...metadata,
-            ...metadataList[i],
-            ...tokenInfoList[i]
-          }))
-          let newMetadataList = metadatas.filter((meta: any) => meta)
-          return newMetadataList;
-        })
-      )
-
-      const solanaCollectibles = await Promise.all(
-        nfts.map(async (nftsForAddress, i) => {
-          // const collectibles = await Promise.all(
-          //   nftsForAddress.map(
-          //     async (nft: any) => await solanaNFTToCollectible(nft.metadata, wallets[i], nft.type)
-          //   )
-          // )
-          // console.log('collectibles', collectibles);
-          let newCollectibles: any = [];
-          nftsForAddress.forEach((collect, index) => {
-            if (collect) {
-              let nft: any = nfts[0][index];
-              newCollectibles.push({
-                ...collect,
-                ...nft,
-                mint: nft.mint,
-                tokenAccount: nft.tokenAccount
-              })
-            }
+            const metadatas = results.map((metadata, i) => ({
+              ...metadata,
+              ...metadataList[i],
+              ...tokenInfoList[i]
+            }))
+            let newMetadataList = metadatas.filter((meta: any) => meta)
+            return newMetadataList;
           })
-          console.log('new collectibles', newCollectibles);
-          return newCollectibles;
-        })
-      )
-      console.log('nfts', nfts);
-      return solanaCollectibles.reduce(
-        (result, collectibles, i) => ({
-          ...result,
-          [wallets[i]]: collectibles
-        }),
-        {}
-      )
-    } catch (e) {
-      console.error('Unable to get collectibles', e)
-      return Promise.resolve({})
+        )
+
+        const solanaCollectibles = await Promise.all(
+          nfts.map(async (nftsForAddress, i) => {
+            // const collectibles = await Promise.all(
+            //   nftsForAddress.map(
+            //     async (nft: any) => await solanaNFTToCollectible(nft.metadata, wallets[i], nft.type)
+            //   )
+            // )
+            // console.log('collectibles', collectibles);
+            let newCollectibles: any = [];
+            nftsForAddress.forEach((collect, index) => {
+              if (collect) {
+                let nft: any = nfts[0][index];
+                newCollectibles.push({
+                  ...collect,
+                  ...nft,
+                  mint: nft.mint,
+                  tokenAccount: nft.tokenAccount
+                })
+              }
+            })
+            return newCollectibles;
+          })
+        )
+        return solanaCollectibles.reduce(
+          (result, collectibles, i) => ({
+            ...result,
+            [wallets[i]]: collectibles
+          }),
+          {}
+        )
+      } catch (e) {
+        console.error('Unable to get collectibles', e)
+        return Promise.resolve({})
+      }
     }
-  }
 
   /**
    * Decode bytes to get url for nft metadata

@@ -1,11 +1,11 @@
 import './App.css';
 
 import React, { useMemo } from 'react';
-import Modal  from 'react-modal';
+import Modal from 'react-modal';
 import {
   BrowserRouter,
   Routes,
-  Route, 
+  Route,
   Navigate
 } from 'react-router-dom';
 
@@ -31,20 +31,20 @@ const AppWithProvider = () => {
     []
   );
   return (
-      <ConnectionProvider endpoint={CLUSTER_API}>
-        <WalletProvider wallets={wallets} autoConnect={false}>
-          <WalletModalProvider>
-            <ToastProvider>
-              <BrowserRouter>
-                <Routes>
+    <ConnectionProvider endpoint={CLUSTER_API}>
+      <WalletProvider wallets={wallets} autoConnect={false}>
+        <WalletModalProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <Routes>
                 <Route path='/' element={<HomePage />} />
-                  <Route path='/' element={<Navigate to='Home' />}/>
-                </Routes>
-              </BrowserRouter>
-            </ToastProvider>
-          </WalletModalProvider>
-        </WalletProvider>
-      </ConnectionProvider>
+                <Route path='/' element={<Navigate to='Home' />} />
+              </Routes>
+            </BrowserRouter>
+          </ToastProvider>
+        </WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
   )
 }
 export default AppWithProvider;

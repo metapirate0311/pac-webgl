@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useConnection, useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
 import {
-  WalletMultiButton, 
+  WalletMultiButton,
 } from "@solana/wallet-adapter-react-ui";
 
 import 'swiper/swiper-bundle.min.css'
@@ -11,17 +11,23 @@ import './index.css';
 
 function HomePage() {
   const walletState = useWallet()
-  //const wallet = useAnchorWallet()
+  // const wallet = useAnchorWallet()
 
   //const { connection } = useConnection()
 
   const [showBtn, setShowBtn] = useState(true)
 
   useEffect(() => {
-    if(walletState.connected || walletState.autoConnect) {
+    if (walletState.connected || walletState.autoConnect) {
       window.dragon.walletConnect(walletState.publicKey)
     }
-   
+
+    console.log('walletState is changed')
+
+    if (walletState.connected && walletState.disconnecting) {
+      window.location.reload()
+    }
+
   }, [walletState])
 
   window.dragon.ShowConnectBtn = function (data) {
@@ -46,9 +52,9 @@ function HomePage() {
     <div className="main">
       {
         showBtn &&
-          <div className="container">
-            <WalletMultiButton className='wallet-btn' />
-          </div>
+        <div className="container">
+          <WalletMultiButton className='wallet-btn' />
+        </div>
       }
     </div>
   )
